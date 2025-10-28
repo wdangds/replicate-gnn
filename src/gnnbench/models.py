@@ -1,4 +1,3 @@
-from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,7 +8,7 @@ _NORM_MAP = {
     "layer": nn.LayerNorm,
     "none": None,
 }
-class GCN(nn.module):
+class GCN(nn.Module):
     f"""
     A configurable-depth GCN with optional residual connections and per-layer normalization. Final layer outputs logits (no act/norm/dropout).
 
@@ -94,5 +93,5 @@ def make_gcn(num_features: int,
         residual = residual,
         norm = norm,
     )
-    
+
     

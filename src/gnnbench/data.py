@@ -133,7 +133,7 @@ def basic_eda(data: Data) -> Dict:
     }
 
 # Generic load from files for external datasets
-def _detect_edge_cols(df: pd.DataFrane):
+def _detect_edge_cols(df: pd.DataFrame):
     cand_src = ["src", "source", "u", "from", "node1"]
     cand_dst = ["dst", "target", "v", "to", "node2"]
     cols_lower = [c.lower() for c in df.columns]

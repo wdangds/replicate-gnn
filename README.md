@@ -238,15 +238,6 @@ Tips for depth > 4:
 * **“permission denied: scripts/train_gcn.py”**
   Run with `python scripts/train_gcn.py …` or `chmod +x scripts/train_gcn.py`.
 
-* **“unrecognized arguments: --layers”**
-  Your script is an old version. Use the package CLI:
-  `python -m gnnbench.cli …` or `gnnbench-train …`.
-  The `scripts/train_gcn.py` should be a 3-line wrapper that imports `gnnbench.cli:main`.
-
-* **`ModuleNotFoundError: _tkinter`**
-  Remove accidental `from turtle import forward` import (belongs to Python’s turtle GUI).
-  `models.py` must only import `torch`, `torch.nn`, and `torch_geometric.nn`.
-
 * **No GPU / CUDA**
   Use `--device cpu` (default auto already picks CPU if GPU isn’t available).
 

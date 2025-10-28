@@ -15,6 +15,9 @@ class ExperimentConfig:
     # model
     hidden: int = 64
     dropout: float = 0.5
+    layers: int = 2
+    residual: bool = True
+    norm: str = "batch" # "batch", "layer", "none"
 
     # training 
     epochs: int = 500

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from tabnanny import verbose
 
 @dataclass
 class ExperimentConfig:

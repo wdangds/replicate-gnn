@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "gnnbench"
 version = "0.1.0"
 description = "Tiny baseline GCN benchmarking toolkit for node classification (PyG)."
+readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
   "torch>=2.1",
@@ -15,6 +16,12 @@ dependencies = [
   "pandas>=2.0"
 ]
 
+[project.scripts]
+gnnbench-train = "gnnbench.cli:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["gnnbench"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gnnbench*"]

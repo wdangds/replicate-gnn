@@ -10,3 +10,5 @@ __all__ = [
     "make_gcn", "train_gcn", "evaluate", "seed_everything", "get_device",
     "accuracy", "macro_f1", "load_from_files", "timestamp", "ensure_dir", "save_json",
 ]
+
+__version__ = "0.1.0"

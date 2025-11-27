@@ -188,3 +188,6 @@ results/
 *.csv
 *.log
 .DS_Store
+
+tex
+tex/

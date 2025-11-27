@@ -24,4 +24,4 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["gnnbench*"]
+include = ["gnnbench*", "inductive_bench*"]

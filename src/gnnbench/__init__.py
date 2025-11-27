@@ -11,4 +11,4 @@ __all__ = [
     "accuracy", "macro_f1", "load_from_files", "timestamp", "ensure_dir", "save_json",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

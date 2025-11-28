@@ -13,7 +13,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix, ConfusionMatrixDisplay
 
 from .data_utils import stratified_split_nodes, make_subgraph
 from .models import GCN, GraphSAGE
@@ -221,6 +221,7 @@ class InductiveExperiment:
         weight_decay: float = 5e-3,
         max_epochs: int = 400,
         patience: int = 40,
+        return_model: bool=False
     ) -> Dict:
         train_data = train_data.to(self.device)
         val_data = val_data.to(self.device)
@@ -291,8 +292,10 @@ class InductiveExperiment:
         if best_state is not None:
             model.load_state_dict({k: v.to(self.device) for k, v in best_state.items()})
 
-        return {"model": model_name, "val_acc": best_val, "test_acc": best_test}
-
+        result = {"model": model_name, "val_acc": best_val, "test_acc": best_test}
+        if return_model:
+            result["trained_model"] = model
+        return result
     # -------------------------
     # High-level APIs (same as before)
     # -------------------------
@@ -408,5 +411,130 @@ class InductiveExperiment:
         if title is None:
             title = f"Performance at train_frac = {train_frac:.2f}"
         plt.title(title)
+        plt.tight_layout()
+        plt.show()
+
+    def plot_confusion_matrices_rf_sage(
+        self,
+        train_frac: float,
+        use_graph_features: bool = True,
+        normalize: Optional[str] = None,
+    ):
+        """
+        Train a RandomForest baseline and GraphSAGE on the given train_frac,
+        then plot test-set confusion matrices for both models.
+
+        Parameters
+        ----------
+        train_frac : float
+            Fraction of nodes used for training (val/test split remaining equally).
+        use_graph_features : bool
+            If True and graph features exist, use BoW + graph features for RF;
+            otherwise use BoW only.
+        normalize : {'true', 'pred', 'all', None}
+            Passed to sklearn.metrics.confusion_matrix.
+        """
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        # --- 1) Stratified split ---
+        train_nodes, val_nodes, test_nodes = stratified_split_nodes(
+            self.node_df,
+            train_frac=train_frac,
+            label_col="label_id",
+            random_state=self.random_state,
+        )
+
+        # -----------------------------
+        # RandomForest confusion matrix
+        # -----------------------------
+        if use_graph_features and len(self.graph_feature_cols) > 0:
+            cols_rf = self.bow_plus_graph_cols
+            rf_label = "RandomForest_BoWGraph"
+        else:
+            cols_rf = self.bow_feature_cols
+            rf_label = "RandomForest_BoW"
+
+        X_train_rf = self.node_df.loc[train_nodes, cols_rf].values
+        y_train_rf = self.node_df.loc[train_nodes, "label_id"].values
+
+        X_test_rf = self.node_df.loc[test_nodes, cols_rf].values
+        y_test_rf = self.node_df.loc[test_nodes, "label_id"].values
+
+        rf = RandomForestClassifier(
+            n_estimators=300,
+            max_depth=None,
+            n_jobs=-1,
+            random_state=self.random_state,
+        )
+        rf.fit(X_train_rf, y_train_rf)
+        y_pred_rf = rf.predict(X_test_rf)
+
+        cm_rf = confusion_matrix(
+            y_test_rf,
+            y_pred_rf,
+            labels=np.arange(len(self.le.classes_)),
+            normalize=normalize,
+        )
+
+        disp_rf = ConfusionMatrixDisplay(
+            confusion_matrix=cm_rf,
+            display_labels=self.le.classes_,
+        )
+        plt.figure(figsize=(6, 5))
+        disp_rf.plot(include_values=True, cmap="Blues", xticks_rotation=45, colorbar=False)
+        plt.title(f"{rf_label} (test confusion matrix, train_frac={train_frac:.2f})")
+        plt.tight_layout()
+        plt.show()
+
+        # -----------------------------
+        # GraphSAGE confusion matrix
+        # -----------------------------
+        # GNNs always use BoW features in this package
+        train_data = make_subgraph(
+            train_nodes, self.node_df, self.edge_df, self.bow_feature_cols
+        )
+        val_data = make_subgraph(
+            val_nodes, self.node_df, self.edge_df, self.bow_feature_cols
+        )
+        test_data = make_subgraph(
+            test_nodes, self.node_df, self.edge_df, self.bow_feature_cols
+        )
+
+        sage_res = self.run_gnn(
+            "GraphSAGE",
+            train_data,
+            val_data,
+            test_data,
+            hidden=64,
+            dropout=0.6,
+            aggr="mean",
+            return_model=True,  # <--- get the trained model back
+        )
+        sage_model = sage_res["trained_model"]
+        sage_model.eval()
+
+        with torch.no_grad():
+            logits = sage_model(
+                test_data.x.to(self.device),
+                test_data.edge_index.to(self.device),
+            )
+            y_test_gs = test_data.y.cpu().numpy()
+            y_pred_gs = logits.argmax(dim=-1).cpu().numpy()
+
+        cm_gs = confusion_matrix(
+            y_test_gs,
+            y_pred_gs,
+            labels=np.arange(len(self.le.classes_)),
+            normalize=normalize,
+        )
+
+        disp_gs = ConfusionMatrixDisplay(
+            confusion_matrix=cm_gs,
+            display_labels=self.le.classes_,
+        )
+        plt.figure(figsize=(6, 5))
+        disp_gs.plot(include_values=True, cmap="Greens", xticks_rotation=45, colorbar=False)
+        plt.title(f"GraphSAGE (test confusion matrix, train_frac={train_frac:.2f})")
         plt.tight_layout()
         plt.show()

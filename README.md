@@ -85,6 +85,10 @@ After `pip install -e .`, you get a console command:
 gnnbench-train --help
 ```
 
+Notes:
+- The package also exposes a module entrypoint so you can run `python -m gnnbench.cli` if you prefer.
+- The CLI supports multi-run sweeps (see the "Sweeps & multi-run usage" section).
+
 ### Common examples
 
 **Cora (classic 2-layer GCN):**
@@ -112,6 +116,34 @@ gnnbench-train --dataset Cora --split ratio --train_ratio 0.6 --val_ratio 0.2 \
 gnnbench-train --dataset Cora --save_model
 ```
 
+### Sweeps & multi-run usage
+
+The CLI includes basic sweep primitives so you can run the same configuration across multiple datasets, seeds, or grid-search hyperparameters.
+
+Examples:
+
+Run the same configuration across several built-in datasets:
+
+```bash
+gnnbench-train --datasets Cora CiteSeer PubMed --layers 2 --root data
+```
+
+Run a grid search (pass a JSON object as a string to `--grid`) and multiple seeds:
+
+```bash
+gnnbench-train --dataset Cora \
+  --grid '{"layers":[2,4],"hidden":[16,64],"dropout":[0.5]}' \
+  --seeds 42 43 44
+```
+
+Notes on the grid:
+
+- Pass a JSON dict mapping parameter names to lists (e.g. `{"layers":[2,4]}`).
+- You can restrict allowed grid keys with `--allow_grid_keys` to catch typos.
+
+When sweeps run, an index CSV is written under a sweep folder (e.g. `results/sweep_<ts>/sweep_index.csv`) summarizing all runs.
+
+
 ### External files (your own graph)
 
 Minimum:
@@ -138,7 +170,9 @@ gnnbench-train \
 * **Data choice**: `--dataset NAME` (built-in) **or** `--edges/--features/--labels` (external)
 * **Splits**: `--split auto|random|ratio` (+ per-class or ratio args)
 * **Model**: `--layers 1..10`, `--hidden 64`, `--dropout 0.5`, `--norm batch|layer|none`, `--no-residual` (to disable)
+  - CLI default for `--norm` is `none` (you can still pass `batch` or `layer`).
 * **Training**: `--epochs 500`, `--patience 50`, `--lr 0.01`, `--weight_decay 5e-4`, `--seed 42`, `--device auto|cpu|cuda`
+* **Sweep / multi-run**: `--datasets`, `--seeds`, `--grid` (JSON string), `--allow_grid_keys`
 * **Outputs**: `--results_dir results`, `--run_name NAME`, `--save_model`
 
 ---
@@ -183,6 +217,7 @@ Each run creates `results/<run_name>/` with:
 * `summary.json` — args, EDA, best val metric, final test metrics
 * `history.csv` — per-epoch validation metrics (loss, acc, macro_f1)
 * `model.pt` — (if `--save_model`) `state_dict()` of the best model
+* `last_run.json` — small snapshot written by the internal training function (useful for programmatic checks)
 
 You can set the folder explicitly with `--run_name`.
 
@@ -196,6 +231,46 @@ You can set the folder explicitly with `--run_name`.
 * Others: `Actor`, `GitHub`, `DeezerEurope`, `LastFMAsia`, `Twitch`, `EllipticBitcoin`
 
 > Add more by extending `get_dataset` in `src/gnnbench/data.py`.
+
+---
+
+## Inductive benchmark (`inductive_bench`)
+
+This repository also includes a small inductive benchmarking module for settings where nodes have per-node features (for example bag-of-words features) and you want to compare simple ML baselines against GNNs on induced subgraphs.
+
+Top-level exports: `InductiveExperiment`, `GCN`, `GraphSAGE` (see `src/inductive_bench`).
+
+Quick example:
+
+```python
+import pandas as pd
+from inductive_bench import InductiveExperiment
+
+# node_df: indexed by node id, includes a label column (default 'subject')
+# and BoW feature columns prefixed by 'w_' (configurable via bow_prefix)
+node_df = pd.read_csv('data/your_nodes.csv', index_col='node_id')
+edge_df = pd.read_csv('data/your_edges.csv')  # columns: source, target
+
+exp = InductiveExperiment(node_df, edge_df, label_col='subject', bow_prefix='w_', add_graph_features=True)
+
+# Run one stratified split (train_frac fraction of nodes used for training)
+df = exp.run_single_split(train_frac=0.2, include_gnns=True)
+print(df)
+
+# Run across multiple train fractions and plot
+grid_df = exp.run_grid([0.05, 0.1, 0.2, 0.4], include_gnns=True)
+exp.plot_overall(grid_df, metric='test_acc')
+```
+
+Notes:
+
+- `node_df` should be a pandas DataFrame indexed by node ids. The default label column name is `subject` (changeable via `label_col`).
+- Bag-of-words columns are detected by `bow_prefix` (default `w_`).
+- `InductiveExperiment` can optionally add per-node graph features (deg, clustering, pagerank, core_number, triangles) via `compute_graph_features` and will use them for BoW+graph baselines.
+- Methods of interest: `run_baselines`, `run_gnn`, `run_single_split`, `run_grid`, and plotting helpers (`plot_overall`, `plot_split`, confusion-matrix helpers).
+- Baselines: Logistic Regression, Random Forest, MLP. GNNs: simple 2-layer `GCN` and `GraphSAGE` implementations in `src/inductive_bench/models.py`.
+
+This section documents the inductive workflow; extend or adapt `inductive_bench` for your dataset formats or additional baselines.
 
 ---
 

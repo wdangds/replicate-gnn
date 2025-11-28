@@ -45,7 +45,7 @@ def _product_dict(grid: Dict[str, List[Any]]) -> Iterable[Dict[str, Any]]:
 
 def _apply_overrides(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str,Any]:
     out = copy.deepcopy(base)
-    out.upadte(overrides)
+    out.update(overrides)
     return out
 
 # Argparser
